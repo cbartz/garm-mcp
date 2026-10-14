@@ -190,3 +190,36 @@ def test_transport_security_derives_origins(CONFIG):
     assert "https://vmhost.local:*" in ts.allowed_origins
     assert "http://vmhost.local:*" in ts.allowed_origins
     assert "https://garm-https.example.com" in ts.allowed_origins
+
+
+@pytest.mark.parametrize("bare_host", ["192.168.122.1", "127.0.0.1", "localhost"])
+def test_bare_host_headers_accepted(CONFIG, bare_host):
+    from starlette.testclient import TestClient
+
+    import dataclasses
+
+    config = dataclasses.replace(CONFIG, bind_address="192.168.122.1:9000")
+    app = build_server(config).streamable_http_app()
+    with TestClient(app, base_url=f"http://{bare_host}") as client:
+        r = client.post("/mcp", headers={
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        }, json=_init_request())
+    assert r.status_code == 200, r.text
+
+
+def test_bare_host_from_allowed_hosts_accepted(CONFIG):
+    import dataclasses
+
+    from starlette.testclient import TestClient
+
+    config = dataclasses.replace(
+        CONFIG, bind_address="192.168.122.1:9000", allowed_hosts=["vmhost.lan:9000"]
+    )
+    app = build_server(config).streamable_http_app()
+    with TestClient(app, base_url="http://vmhost.lan") as client:
+        r = client.post("/mcp", headers={
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        }, json=_init_request())
+    assert r.status_code == 200, r.text

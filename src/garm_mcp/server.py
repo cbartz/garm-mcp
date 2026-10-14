@@ -9,6 +9,7 @@ from garm_mcp.tools import (
     get_controller_info_view,
     get_instance_view,
     list_instances_view,
+    list_jobs_view,
     list_view,
     resolve_deployment,
 )
@@ -19,11 +20,15 @@ def _transport_security(config: Config) -> TransportSecuritySettings:
     allowed = [
         config.bind_address,
         f"{bind_host}:*",
+        bind_host,
         "127.0.0.1:*",
+        "127.0.0.1",
         "localhost:*",
+        "localhost",
         "[::1]:*",
         *config.allowed_hosts,
     ]
+    allowed.extend(h.split(":", 1)[0] for h in config.allowed_hosts if ":" in h)
     allowed = list(dict.fromkeys(allowed))
     origins = [f"{scheme}://{entry}" for entry in allowed for scheme in ("http", "https")]
     origins.extend(config.allowed_origins)
@@ -97,7 +102,22 @@ def build_server(config: Config) -> FastMCP:
         )(tool)
 
     register_list_tool("garm_list_scalesets", "list_scalesets", "scale sets")
-    register_list_tool("garm_list_jobs", "list_jobs", "workflow jobs")
+
+    def jobs_tool(deployment: Deployment | None = None) -> dict:
+        return list_jobs_view(client_for(deployment))
+
+    jobs_tool.__name__ = "garm_list_jobs"
+    mcp.tool(
+        name="garm_list_jobs",
+        description=(
+            "List GARM workflow jobs. Handles both GARM API shapes: plain lists and "
+            "paginated {total_count, results} responses (requests page 1 with pageSize 250). "
+            "Returns {items, total, truncated}: 'total' is the API's total_count when "
+            "paginated, otherwise the full fetched count; 'truncated' is true when not all "
+            "jobs are in 'items'. 'deployment' selects the GARM deployment (default: the "
+            "configured default)."
+        ),
+    )(jobs_tool)
     register_list_tool("garm_list_repositories", "list_repositories", "repositories")
     register_list_tool("garm_list_organizations", "list_organizations", "organizations")
     register_list_tool("garm_list_enterprises", "list_enterprises", "enterprises")

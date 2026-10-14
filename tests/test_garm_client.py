@@ -72,3 +72,35 @@ def test_401_without_credentials_raises():
     responses.get(f"{BASE}/api/v1/instances", json={"error": {"message": "unauthorized", "type": 0}}, status=401)
     with pytest.raises(GarmApiError, match="unauthorized"):
         GarmClient(**CLIENT).list_instances()
+
+
+@responses.activate
+def test_list_jobs_unwraps_paginated_response():
+    responses.get(f"{BASE}/api/v1/jobs",
+                  json={"total_count": 300, "pages": 2, "current_page": 1, "results": [{"id": 1}]})
+    jobs, total = GarmClient(**CLIENT).list_jobs_page()
+    assert [j["id"] for j in jobs] == [1]
+    assert total == 300
+    assert "pageSize=250" in responses.calls[0].request.url
+
+
+@responses.activate
+def test_list_jobs_handles_legacy_list_response():
+    responses.get(f"{BASE}/api/v1/jobs", json=[{"id": 1}, {"id": 2}])
+    jobs, total = GarmClient(**CLIENT).list_jobs_page()
+    assert len(jobs) == 2 and total is None
+
+
+@responses.activate
+def test_list_jobs_keeps_list_contract():
+    responses.get(f"{BASE}/api/v1/jobs", json=[])
+    assert GarmClient(**CLIENT).list_jobs() == []
+
+
+@responses.activate
+def test_flat_error_response_parses():
+    responses.get(f"{BASE}/api/v1/instances",
+                  json={"error": "Bad Request", "details": "bad pool"}, status=400)
+    with pytest.raises(GarmApiError, match="Bad Request: bad pool") as ei:
+        GarmClient(**CLIENT).list_instances()
+    assert ei.value.status_code == 400

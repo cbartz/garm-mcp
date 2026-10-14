@@ -66,11 +66,26 @@ class GarmClient:
     def _parse(self, resp: requests.Response):
         if resp.ok:
             return resp.json()
+        raise GarmApiError(message=self._error_message(resp), status_code=resp.status_code)
+
+    def _error_message(self, resp: requests.Response) -> str:
         try:
-            message = resp.json()["error"]["message"]
+            error = resp.json()["error"]
         except (ValueError, KeyError, TypeError):
-            message = f"unknown error (HTTP {resp.status_code})"
-        raise GarmApiError(message=message, status_code=resp.status_code)
+            return f"unknown error (HTTP {resp.status_code})"
+        if isinstance(error, dict):
+            message = error.get("message")
+            if not isinstance(message, str) or not message:
+                return f"unknown error (HTTP {resp.status_code})"
+            details = error.get("details") if isinstance(error.get("details"), str) else None
+        elif isinstance(error, str):
+            message = error
+            details = resp.json().get("details") if isinstance(resp.json().get("details"), str) else None
+        else:
+            return f"unknown error (HTTP {resp.status_code})"
+        if details:
+            return f"{message}: {details}"
+        return message
 
     def _get(self, path: str):
         if not self.token and self._has_credentials():
@@ -94,7 +109,21 @@ class GarmClient:
         return self._get(f"scalesets/{scaleset_id}/instances")
 
     def list_jobs(self) -> list:
-        return self._get("jobs")
+        results, _ = self.list_jobs_page()
+        return results
+
+    def list_jobs_page(self) -> tuple:
+        """Fetch jobs, handling both plain-list and paginated response shapes."""
+        payload = self._get("jobs?page=1&pageSize=250")
+        if isinstance(payload, list):
+            return payload, None
+        if isinstance(payload, dict) and isinstance(payload.get("results"), list):
+            total = payload.get("total_count")
+            return payload["results"], (total if isinstance(total, int) else None)
+        raise GarmApiError(
+            message="unexpected response shape for /jobs",
+            status_code=None,
+        )
 
     def list_repositories(self) -> list:
         return self._get("repositories")

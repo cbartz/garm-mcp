@@ -5,6 +5,7 @@ from garm_mcp.garm_client import GarmClient
 from garm_mcp.tools import (
     get_controller_info_view,
     get_instance_view,
+    list_jobs_view,
     list_view,
     resolve_deployment,
 )
@@ -42,3 +43,20 @@ def test_resolve_deployment_default_and_unknown(CONFIG):
     assert resolve_deployment(CONFIG, "staging").name == "staging"
     with pytest.raises(ValueError, match="unknown deployment 'nope'; configured:"):
         resolve_deployment(CONFIG, "nope")
+
+
+@responses.activate
+def test_jobs_view_paginated_shape():
+    responses.get("https://g.example.com/api/v1/jobs",
+                  json={"total_count": 300, "results": [{"status": "queued", "github_token": "T"}]})
+    out = list_jobs_view(CLIENT)
+    assert out["total"] == 300 and out["truncated"] is True and len(out["items"]) == 1
+    assert out["items"][0]["github_token"] == "[REDACTED]"
+
+
+@responses.activate
+def test_jobs_view_legacy_shape_truncates():
+    data = [{"name": f"j{n}"} for n in range(251)]
+    responses.get("https://g.example.com/api/v1/jobs", json=data)
+    out = list_jobs_view(CLIENT)
+    assert out["total"] == 251 and out["truncated"] is True and len(out["items"]) == 250
