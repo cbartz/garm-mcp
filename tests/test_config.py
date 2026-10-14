@@ -283,3 +283,10 @@ def test_bind_address_whitespace_in_host_raises(tmp_path, value):
     p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(bind_address=value)))
     with pytest.raises(ConfigError, match="has invalid host"):
         load_config(str(p))
+
+
+@pytest.mark.parametrize("value", ["a" * 31 + "\n", "é" * 32, "a" * 31 + " "])
+def test_endpoint_token_with_invalid_chars_raises(tmp_path, value):
+    p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(endpoint_token=value)))
+    with pytest.raises(ConfigError, match="strong random value"):
+        load_config(str(p))

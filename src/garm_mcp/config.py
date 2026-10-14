@@ -83,10 +83,11 @@ def _validate_endpoint_token(value: object) -> str:
         or value != value.strip()
         or value.strip().upper() == "CHANGE_ME"
         or len(value) < 32
+        or not all(0x20 < ord(c) < 0x7F for c in value)
     ):
         raise ConfigError(
-            "endpoint_token must be set to a strong random value of at least 32 "
-            "characters (see README host setup)"
+            "endpoint_token must be a strong random value of at least 32 printable "
+            "ASCII characters (see README host setup)"
         )
     return value
 
