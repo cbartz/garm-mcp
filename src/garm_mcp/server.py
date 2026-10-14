@@ -1,6 +1,7 @@
 from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from garm_mcp.config import Config, check_token_expiry
 from garm_mcp.garm_client import GarmClient
@@ -11,6 +12,23 @@ from garm_mcp.tools import (
     list_view,
     resolve_deployment,
 )
+
+
+def _transport_security(config: Config) -> TransportSecuritySettings:
+    bind_host = config.bind_address.rsplit(":", 1)[0]
+    allowed = [
+        config.bind_address,
+        f"{bind_host}:*",
+        "127.0.0.1:*",
+        "localhost:*",
+        "[::1]:*",
+        *config.allowed_hosts,
+    ]
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=list(dict.fromkeys(allowed)),
+        allowed_origins=["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"],
+    )
 
 
 def build_server(config: Config) -> FastMCP:
@@ -28,7 +46,7 @@ def build_server(config: Config) -> FastMCP:
         )
 
     Deployment = Literal[tuple(sorted(config.deployments))]  # type: ignore[valid-type]
-    mcp = FastMCP("garm-mcp")
+    mcp = FastMCP("garm-mcp", transport_security=_transport_security(config))
 
     def client_for(deployment: str | None) -> GarmClient:
         return clients[resolve_deployment(config, deployment).name]

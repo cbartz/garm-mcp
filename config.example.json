@@ -1,6 +1,7 @@
 {
   "bind_address": "127.0.0.1:9000",
   "endpoint_token": "CHANGE_ME",
+  "allowed_hosts": [],
   "default_deployment": "prod",
   "deployments": {
     "prod": {"base_url": "https://garm-prod.example.com", "username": "admin", "password": "CHANGE_ME", "ca_bundle": null},

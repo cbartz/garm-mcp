@@ -32,7 +32,7 @@ Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/).
    sudo chmod 600 /etc/garm-mcp/config.json
    ```
 
-   Edit it: set `bind_address`, `default_deployment`, and one entry per GARM deployment under `deployments` (see [GARM authentication](#4-garm-authentication)). Each deployment has `base_url`, optional `ca_bundle` (path to a CA file for a private/self-signed GARM certificate), and exactly one auth mode: `username` + `password`, or `token`.
+   Edit it: set `bind_address`, `endpoint_token` (step 3), `default_deployment`, and one entry per GARM deployment under `deployments` (see [GARM authentication](#4-garm-authentication)). Each deployment has `base_url`, optional `ca_bundle` (path to a CA file for a private/self-signed GARM certificate), and exactly one auth mode: `username` + `password`, or `token`.
 
    Make the file readable by the user that runs the server (for example `chown` it to that user).
 
@@ -50,9 +50,11 @@ Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/).
 
    `--config` defaults to the `GARM_MCP_CONFIG` environment variable. The MCP endpoint is served at `http://<bind_address>/mcp`.
 
+**Allowed Host headers.** The server rejects requests whose `Host` header is not on an allow-list (DNS-rebinding protection; the response is `421 Invalid Host header`). The allow-list is built automatically from `bind_address` (host and exact `host:port`) plus loopback names, so an agent that connects to the same address you bound works with no extra setup. If the agent reaches the server under a different name or address (a DNS name, a NAT or port-forwarded address, a reverse proxy), list those `Host` values in the optional `allowed_hosts` config key, for example `"allowed_hosts": ["garm-host.lan:9000", "garm-host.lan:*"]` (a trailing `:*` matches any port). The default is an empty list.
+
 **Bind address.** `bind_address` is a plain `host:port` (default in the example: `127.0.0.1:9000`). Bind to an interface that only the agent VM can reach (for example a host-only/bridge address), never `0.0.0.0` on a network others can reach. The bearer token is the second layer, not the first. The server speaks plain HTTP; if traffic crosses a network you do not trust, terminate TLS in a reverse proxy in front of it.
 
-**Startup failures are loud.** A bad or missing config (`ConfigError`), or an expired static token, makes the process exit with a Python traceback whose last line is the error message. There is no friendlier wrapper in v1; check the last line.
+**Startup failures are loud.** A bad or missing config (`ConfigError`: malformed JSON, missing keys, an empty or `CHANGE_ME` `endpoint_token`, an empty `username`/`password`/`token`, ...), or an expired static token, makes the process exit with a Python traceback whose last line is the error message. There is no friendlier wrapper in v1; check the last line.
 
 ## 3. Agent/VM setup
 
@@ -75,7 +77,13 @@ Give the agent harness the server URL and the endpoint token. For a harness that
 **Fallback for stdio-only harnesses (v1).** If the harness can only launch stdio MCP servers, use `mcp-remote` as the bridge. This is a documented fallback only; v1 ships no custom bridge:
 
 ```bash
-npx mcp-remote http://<host-address>:9000/mcp --header "Authorization: Bearer <endpoint token>"
+npx mcp-remote http://<host-address>:9000/mcp --allow-http --header-file /path/to/headers.txt
+```
+
+`mcp-remote` refuses non-localhost `http://` URLs unless `--allow-http` is given. Put the token in a headers file (one `Name: value` per line, mode 600) instead of passing it with `--header`, which would expose it in the VM's process list:
+
+```
+Authorization: Bearer <endpoint token>
 ```
 
 The VM needs only the URL and the endpoint token. Do not copy any GARM credential into it.
