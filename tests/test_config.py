@@ -267,3 +267,12 @@ def test_base_url_query_fragment_and_bad_port_raises(tmp_path, url):
     p = tmp_path / "config.json"; p.write_text(json.dumps(cfg))
     with pytest.raises(ConfigError, match="deployment 'prod' has invalid 'base_url'"):
         load_config(str(p))
+
+
+@pytest.mark.parametrize("url", ["https://:443", "https:///path"])
+def test_base_url_without_hostname_raises(tmp_path, url):
+    cfg = _cfg_with()
+    cfg["deployments"]["prod"]["base_url"] = url
+    p = tmp_path / "config.json"; p.write_text(json.dumps(cfg))
+    with pytest.raises(ConfigError, match="deployment 'prod' has invalid 'base_url'"):
+        load_config(str(p))

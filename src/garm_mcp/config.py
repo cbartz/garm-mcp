@@ -40,7 +40,7 @@ def _parse_deployment(name: str, raw: dict) -> DeploymentConfig:
     if not isinstance(base_url, str) or not base_url or base_url != base_url.strip():
         raise ConfigError(f"deployment '{name}' has invalid 'base_url'")
     split = urlsplit(base_url)
-    if split.scheme not in ("http", "https") or not split.netloc:
+    if split.scheme not in ("http", "https") or not split.netloc or split.hostname is None:
         raise ConfigError(f"deployment '{name}' has invalid 'base_url'")
     if split.query or split.fragment:
         raise ConfigError(f"deployment '{name}' has invalid 'base_url'")
