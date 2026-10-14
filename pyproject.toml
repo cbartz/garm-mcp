@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "garm-mcp"
+version = "0.1.0"
+description = "Read-only MCP server exposing GARM REST API tools"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.15,<2",
+    "requests>=2.31",
+    "uvicorn>=0.23",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "responses",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/garm_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
