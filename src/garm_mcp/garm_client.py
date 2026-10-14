@@ -114,7 +114,7 @@ class GarmClient:
 
     def list_jobs_page(self) -> tuple:
         """Fetch jobs, handling both plain-list and paginated response shapes."""
-        payload = self._get("jobs?page=1&pageSize=250")
+        payload = self._get("jobs?page=1&pageSize=250&all=true")
         if isinstance(payload, list):
             return payload, None
         if isinstance(payload, dict) and isinstance(payload.get("results"), list):

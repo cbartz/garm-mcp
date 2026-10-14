@@ -49,11 +49,11 @@ def list_view(client: GarmClient, method_name: str) -> dict:
 
 def list_jobs_view(client: GarmClient) -> dict:
     items, total = client.list_jobs_page()
+    page, fetched_total, client_truncated = truncate_items(items)
+    page = redact(page)
     if total is None:
-        page, total, truncated = truncate_items(items)
-        return {"items": redact(page), "total": total, "truncated": truncated}
-    page = redact(items)
-    return {"items": page, "total": total, "truncated": total > len(page)}
+        return {"items": page, "total": fetched_total, "truncated": client_truncated}
+    return {"items": page, "total": total, "truncated": total > len(page) or client_truncated}
 
 
 def get_controller_info_view(client: GarmClient) -> dict:

@@ -60,3 +60,12 @@ def test_jobs_view_legacy_shape_truncates():
     responses.get("https://g.example.com/api/v1/jobs", json=data)
     out = list_jobs_view(CLIENT)
     assert out["total"] == 251 and out["truncated"] is True and len(out["items"]) == 250
+
+
+@responses.activate
+def test_jobs_view_paginated_respects_cap():
+    results = [{"name": f"j{n}"} for n in range(400)]
+    responses.get("https://g.example.com/api/v1/jobs",
+                  json={"total_count": 400, "results": results})
+    out = list_jobs_view(CLIENT)
+    assert out["total"] == 400 and out["truncated"] is True and len(out["items"]) == 250

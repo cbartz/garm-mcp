@@ -82,6 +82,7 @@ def test_list_jobs_unwraps_paginated_response():
     assert [j["id"] for j in jobs] == [1]
     assert total == 300
     assert "pageSize=250" in responses.calls[0].request.url
+    assert "all=true" in responses.calls[0].request.url
 
 
 @responses.activate
