@@ -42,6 +42,12 @@ def _parse_deployment(name: str, raw: dict) -> DeploymentConfig:
     split = urlsplit(base_url)
     if split.scheme not in ("http", "https") or not split.netloc:
         raise ConfigError(f"deployment '{name}' has invalid 'base_url'")
+    if split.query or split.fragment:
+        raise ConfigError(f"deployment '{name}' has invalid 'base_url'")
+    try:
+        split.port
+    except ValueError as exc:
+        raise ConfigError(f"deployment '{name}' has invalid 'base_url'") from exc
     for key in ("ca_bundle", "token", "username", "password"):
         value = raw.get(key)
         if value is None:

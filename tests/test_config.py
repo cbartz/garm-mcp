@@ -254,3 +254,16 @@ def test_base_url_without_http_scheme_raises(tmp_path, url):
 def test_huge_int_exp_raises():
     with pytest.raises(ConfigError, match="cannot parse GARM token for deployment 'prod'"):
         check_token_expiry("prod", make_jwt({"exp": 10**400}))
+
+
+@pytest.mark.parametrize("url", [
+    "https://garm.example.com?tenant=x",
+    "https://garm.example.com#frag",
+    "https://garm.example.com:foo",
+])
+def test_base_url_query_fragment_and_bad_port_raises(tmp_path, url):
+    cfg = _cfg_with()
+    cfg["deployments"]["prod"]["base_url"] = url
+    p = tmp_path / "config.json"; p.write_text(json.dumps(cfg))
+    with pytest.raises(ConfigError, match="deployment 'prod' has invalid 'base_url'"):
+        load_config(str(p))
