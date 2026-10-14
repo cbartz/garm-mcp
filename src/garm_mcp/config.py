@@ -163,7 +163,9 @@ def check_token_expiry(name: str, token: str, now: float | None = None) -> None:
     if "exp" not in claims:
         raise ConfigError(f"GARM token for deployment '{name}' has no exp claim; refusing token")
     exp = claims["exp"]
-    if isinstance(exp, bool) or not isinstance(exp, (int, float)) or not math.isfinite(exp):
+    if isinstance(exp, bool) or not isinstance(exp, (int, float)):
+        raise ConfigError(f"cannot parse GARM token for deployment '{name}'") from None
+    if isinstance(exp, float) and not math.isfinite(exp):
         raise ConfigError(f"cannot parse GARM token for deployment '{name}'") from None
     try:
         expired_at = datetime.fromtimestamp(exp, tz=timezone.utc).isoformat()
