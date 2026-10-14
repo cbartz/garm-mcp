@@ -72,7 +72,7 @@ def _write(tmp_path, data):
 @pytest.mark.parametrize("value", ["", "   ", "CHANGE_ME", "change_me", " Change_Me "])
 def test_placeholder_or_empty_endpoint_token_raises(tmp_path, value):
     path = _write(tmp_path, dict(VALID, endpoint_token=value))
-    with pytest.raises(ConfigError, match="endpoint_token must be set to a strong random value"):
+    with pytest.raises(ConfigError, match="endpoint_token must be a strong random value"):
         load_config(path)
 
 
