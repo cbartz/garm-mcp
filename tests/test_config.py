@@ -121,3 +121,83 @@ def test_allowed_hosts_defaults_empty_and_loads(tmp_path):
 def test_allowed_hosts_must_be_list_of_strings(tmp_path, value):
     with pytest.raises(ConfigError, match="allowed_hosts must be a list of strings"):
         load_config(_write(tmp_path, dict(VALID, allowed_hosts=value)))
+
+
+def _cfg_with(**overrides):
+    cfg = json.loads(json.dumps(VALID))
+    cfg.update(overrides)
+    return cfg
+
+
+def test_non_string_base_url_raises(tmp_path):
+    cfg = _cfg_with()
+    cfg["deployments"]["prod"]["base_url"] = None
+    p = tmp_path / "config.json"; p.write_text(json.dumps(cfg))
+    with pytest.raises(ConfigError, match="deployment 'prod' has invalid 'base_url'"):
+        load_config(str(p))
+
+
+def test_blank_base_url_raises(tmp_path):
+    cfg = _cfg_with()
+    cfg["deployments"]["prod"]["base_url"] = "   "
+    p = tmp_path / "config.json"; p.write_text(json.dumps(cfg))
+    with pytest.raises(ConfigError, match="deployment 'prod' has invalid 'base_url'"):
+        load_config(str(p))
+
+
+def test_ca_bundle_non_string_raises(tmp_path):
+    cfg = _cfg_with()
+    cfg["deployments"]["prod"]["ca_bundle"] = 123
+    p = tmp_path / "config.json"; p.write_text(json.dumps(cfg))
+    with pytest.raises(ConfigError, match="deployment 'prod' has invalid 'ca_bundle'"):
+        load_config(str(p))
+
+
+def test_blank_ca_bundle_raises(tmp_path):
+    cfg = _cfg_with()
+    cfg["deployments"]["prod"]["ca_bundle"] = "  "
+    p = tmp_path / "config.json"; p.write_text(json.dumps(cfg))
+    with pytest.raises(ConfigError, match="deployment 'prod' has invalid 'ca_bundle'"):
+        load_config(str(p))
+
+
+def test_bind_address_without_port_raises(tmp_path):
+    p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(bind_address="localhost")))
+    with pytest.raises(ConfigError, match="bind_address 'localhost' is not 'host:port'"):
+        load_config(str(p))
+
+
+@pytest.mark.parametrize("value", ["h:0", "h:70000", "h:abc"])
+def test_bind_address_bad_port_raises(tmp_path, value):
+    p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(bind_address=value)))
+    with pytest.raises(ConfigError, match="invalid port"):
+        load_config(str(p))
+
+
+def test_bind_address_ipv6_brackets_raises(tmp_path):
+    p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(bind_address="[::1]:9000")))
+    with pytest.raises(ConfigError, match="bracketed IPv6 hosts are not supported"):
+        load_config(str(p))
+
+
+def test_bind_address_wildcard_ok(tmp_path):
+    p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(bind_address="0.0.0.0:9000")))
+    assert load_config(str(p)).bind_address == "0.0.0.0:9000"
+
+
+@pytest.mark.parametrize("exp", ["tomorrow", None, True])
+def test_exp_non_numeric_raises(exp):
+    with pytest.raises(ConfigError, match="cannot parse GARM token for deployment 'prod'"):
+        check_token_expiry("prod", make_jwt({"exp": exp}))
+
+
+def test_allowed_origins_key_loads(tmp_path):
+    cfg = _cfg_with(allowed_origins=["https://garm.example.com"])
+    p = tmp_path / "config.json"; p.write_text(json.dumps(cfg))
+    assert load_config(str(p)).allowed_origins == ["https://garm.example.com"]
+
+
+def test_allowed_origins_must_be_list_of_strings(tmp_path):
+    p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(allowed_origins="http://x")))
+    with pytest.raises(ConfigError, match="allowed_origins must be a list of strings"):
+        load_config(str(p))

@@ -24,10 +24,13 @@ def _transport_security(config: Config) -> TransportSecuritySettings:
         "[::1]:*",
         *config.allowed_hosts,
     ]
+    allowed = list(dict.fromkeys(allowed))
+    origins = [f"{scheme}://{entry}" for entry in allowed for scheme in ("http", "https")]
+    origins.extend(config.allowed_origins)
     return TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
-        allowed_hosts=list(dict.fromkeys(allowed)),
-        allowed_origins=["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"],
+        allowed_hosts=allowed,
+        allowed_origins=list(dict.fromkeys(origins)),
     )
 
 

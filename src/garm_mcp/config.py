@@ -28,19 +28,25 @@ class Config:
     deployments: dict[str, DeploymentConfig] = field(default_factory=dict)
     default_deployment: str = ""
     allowed_hosts: list[str] = field(default_factory=list)
+    allowed_origins: list[str] = field(default_factory=list)
 
 
 def _parse_deployment(name: str, raw: dict) -> DeploymentConfig:
     if "base_url" not in raw:
         raise ConfigError(f"deployment '{name}' missing required key: base_url")
-    for key in ("token", "username", "password"):
+    base_url = raw["base_url"]
+    if not isinstance(base_url, str) or not base_url.strip():
+        raise ConfigError(f"deployment '{name}' has invalid 'base_url'")
+    for key in ("ca_bundle", "token", "username", "password"):
         value = raw.get(key)
         if value is None:
             continue
         if not isinstance(value, str):
-            raise ConfigError(f"deployment '{name}' has non-string '{key}'")
+            raise ConfigError(f"deployment '{name}' has invalid '{key}'")
         if not value:
             raise ConfigError(f"deployment '{name}' has empty '{key}'")
+        if not value.strip():
+            raise ConfigError(f"deployment '{name}' has invalid '{key}'")
     token = raw.get("token")
     username = raw.get("username")
     password = raw.get("password")
@@ -78,9 +84,15 @@ def _parse_config(raw: object) -> Config:
         if key not in raw:
             raise ConfigError(f"missing required config key: {key}")
     endpoint_token = _validate_endpoint_token(raw["endpoint_token"])
+    bind_address = _validate_bind_address(raw["bind_address"])
     allowed_hosts = raw.get("allowed_hosts", [])
     if not isinstance(allowed_hosts, list) or not all(isinstance(h, str) for h in allowed_hosts):
         raise ConfigError("allowed_hosts must be a list of strings")
+    allowed_origins = raw.get("allowed_origins", [])
+    if not isinstance(allowed_origins, list) or not all(
+        isinstance(o, str) for o in allowed_origins
+    ):
+        raise ConfigError("allowed_origins must be a list of strings")
     if not isinstance(raw["deployments"], dict):
         raise ConfigError("invalid config: 'deployments' must be an object")
     deployments = {}
@@ -93,12 +105,28 @@ def _parse_config(raw: object) -> Config:
             f"default_deployment '{raw['default_deployment']}' is not a configured deployment"
         )
     return Config(
-        bind_address=raw["bind_address"],
+        bind_address=bind_address,
         endpoint_token=endpoint_token,
         deployments=deployments,
         default_deployment=raw["default_deployment"],
         allowed_hosts=allowed_hosts,
+        allowed_origins=allowed_origins,
     )
+
+
+def _validate_bind_address(value: object) -> str:
+    if not isinstance(value, str) or ":" not in value:
+        raise ConfigError(f"bind_address '{value}' is not 'host:port'")
+    host, _, port = value.rpartition(":")
+    if not host:
+        raise ConfigError(f"bind_address '{value}' is not 'host:port'")
+    if host.startswith("["):
+        raise ConfigError(
+            f"bind_address '{value}': bracketed IPv6 hosts are not supported"
+        )
+    if not port.isdigit() or not 1 <= int(port) <= 65535:
+        raise ConfigError(f"bind_address '{value}' has invalid port (must be 1-65535)")
+    return value
 
 
 def load_config(path: str | None = None) -> Config:
@@ -124,9 +152,13 @@ def check_token_expiry(name: str, token: str, now: float | None = None) -> None:
         claims = json.loads(base64.urlsafe_b64decode(segment))
     except (IndexError, ValueError):
         raise ConfigError(f"cannot parse GARM token for deployment '{name}'") from None
+    if not isinstance(claims, dict):
+        raise ConfigError(f"cannot parse GARM token for deployment '{name}'") from None
     if "exp" not in claims:
         raise ConfigError(f"GARM token for deployment '{name}' has no exp claim; refusing token")
     exp = claims["exp"]
+    if isinstance(exp, bool) or not isinstance(exp, (int, float)):
+        raise ConfigError(f"cannot parse GARM token for deployment '{name}'") from None
     if exp <= (now if now is not None else time.time()):
         expired_at = datetime.fromtimestamp(exp, tz=timezone.utc).isoformat()
         raise ConfigError(

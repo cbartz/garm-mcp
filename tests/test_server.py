@@ -121,3 +121,72 @@ def test_host_header_allowlist(CONFIG, host, extra, expected):
                  "params": {"protocolVersion": "2025-03-26", "capabilities": {},
                             "clientInfo": {"name": "t", "version": "0"}}})
     assert r.status_code == expected
+
+
+def _init_request():
+    return {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "params": {"protocolVersion": "2025-03-26", "capabilities": {},
+                       "clientInfo": {"name": "t", "version": "0"}}}
+
+
+@pytest.mark.parametrize("origin, extra, expected", [
+    ("http://192.168.122.1:9000", [], 200),
+    ("https://192.168.122.1:9000", [], 200),
+    ("http://vmhost.local:9000", [], 403),
+    ("http://vmhost.local:9000", ["vmhost.local:*"], 200),
+    ("https://garm.example.com", ["garm.example.com"], 200),  # proxy name listed via allowed_hosts
+    ("http://evil.example.com", [], 403),
+])
+def test_origin_header_allowlist(CONFIG, origin, extra, expected):
+    import dataclasses
+
+    from starlette.testclient import TestClient
+
+    config = dataclasses.replace(
+        CONFIG, bind_address="192.168.122.1:9000", allowed_hosts=extra
+    )
+    app = build_server(config).streamable_http_app()
+    with TestClient(app, base_url="http://192.168.122.1:9000") as client:
+        r = client.post("/mcp", headers={
+            "Origin": origin,
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        }, json=_init_request())
+    assert r.status_code == expected
+
+
+def test_wrapped_app_accepts_configured_extra_origin(CONFIG):
+    import dataclasses
+
+    from starlette.testclient import TestClient
+
+    config = dataclasses.replace(
+        CONFIG, bind_address="192.168.122.1:9000",
+        allowed_origins=["https://garm-https.example.com"],
+    )
+    app = build_server(config).streamable_http_app()
+    with TestClient(app, base_url="http://192.168.122.1:9000") as client:
+        r = client.post("/mcp", headers={
+            "Origin": "https://garm-https.example.com",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        }, json=_init_request())
+    assert r.status_code == 200, r.text
+
+
+def test_transport_security_derives_origins(CONFIG):
+    import dataclasses
+
+    from garm_mcp.server import _transport_security
+
+    config = dataclasses.replace(
+        CONFIG, bind_address="192.168.122.1:9000",
+        allowed_hosts=["vmhost.local:*"],
+        allowed_origins=["https://garm-https.example.com"],
+    )
+    ts = _transport_security(config)
+    assert "http://192.168.122.1:*" in ts.allowed_origins
+    assert "https://192.168.122.1:9000" in ts.allowed_origins
+    assert "https://vmhost.local:*" in ts.allowed_origins
+    assert "http://vmhost.local:*" in ts.allowed_origins
+    assert "https://garm-https.example.com" in ts.allowed_origins
