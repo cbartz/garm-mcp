@@ -201,3 +201,9 @@ def test_allowed_origins_must_be_list_of_strings(tmp_path):
     p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(allowed_origins="http://x")))
     with pytest.raises(ConfigError, match="allowed_origins must be a list of strings"):
         load_config(str(p))
+
+
+@pytest.mark.parametrize("exp", [1e9999, -1e9999, 1e30])
+def test_exp_non_finite_or_out_of_range_raises(exp):
+    with pytest.raises(ConfigError, match="cannot parse GARM token for deployment 'prod'"):
+        check_token_expiry("prod", make_jwt({"exp": exp}))

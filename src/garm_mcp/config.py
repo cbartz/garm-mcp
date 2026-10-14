@@ -1,5 +1,6 @@
 import base64
 import json
+import math
 import os
 import time
 from dataclasses import dataclass, field
@@ -157,10 +158,13 @@ def check_token_expiry(name: str, token: str, now: float | None = None) -> None:
     if "exp" not in claims:
         raise ConfigError(f"GARM token for deployment '{name}' has no exp claim; refusing token")
     exp = claims["exp"]
-    if isinstance(exp, bool) or not isinstance(exp, (int, float)):
+    if isinstance(exp, bool) or not isinstance(exp, (int, float)) or not math.isfinite(exp):
         raise ConfigError(f"cannot parse GARM token for deployment '{name}'") from None
-    if exp <= (now if now is not None else time.time()):
+    try:
         expired_at = datetime.fromtimestamp(exp, tz=timezone.utc).isoformat()
+    except (OverflowError, OSError, ValueError) as exc:
+        raise ConfigError(f"cannot parse GARM token for deployment '{name}'") from exc
+    if exp <= (now if now is not None else time.time()):
         raise ConfigError(
             f"GARM token for deployment '{name}' expired at {expired_at}; "
             "mint a longer-lived JWT (see README)"
