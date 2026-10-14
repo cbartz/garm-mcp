@@ -36,7 +36,7 @@ def _parse_deployment(name: str, raw: dict) -> DeploymentConfig:
     if "base_url" not in raw:
         raise ConfigError(f"deployment '{name}' missing required key: base_url")
     base_url = raw["base_url"]
-    if not isinstance(base_url, str) or not base_url.strip():
+    if not isinstance(base_url, str) or not base_url or base_url != base_url.strip():
         raise ConfigError(f"deployment '{name}' has invalid 'base_url'")
     for key in ("ca_bundle", "token", "username", "password"):
         value = raw.get(key)
@@ -46,7 +46,7 @@ def _parse_deployment(name: str, raw: dict) -> DeploymentConfig:
             raise ConfigError(f"deployment '{name}' has invalid '{key}'")
         if not value:
             raise ConfigError(f"deployment '{name}' has empty '{key}'")
-        if not value.strip():
+        if value != value.strip():
             raise ConfigError(f"deployment '{name}' has invalid '{key}'")
     token = raw.get("token")
     username = raw.get("username")
@@ -70,10 +70,13 @@ def _validate_endpoint_token(value: object) -> str:
     if (
         not isinstance(value, str)
         or not value.strip()
+        or value != value.strip()
         or value.strip().upper() == "CHANGE_ME"
+        or len(value) < 32
     ):
         raise ConfigError(
-            "endpoint_token must be set to a strong random value (see README host setup)"
+            "endpoint_token must be set to a strong random value of at least 32 "
+            "characters (see README host setup)"
         )
     return value
 
@@ -121,10 +124,8 @@ def _validate_bind_address(value: object) -> str:
     host, _, port = value.rpartition(":")
     if not host:
         raise ConfigError(f"bind_address '{value}' is not 'host:port'")
-    if host.startswith("["):
-        raise ConfigError(
-            f"bind_address '{value}': bracketed IPv6 hosts are not supported"
-        )
+    if ":" in host or host.startswith("["):
+        raise ConfigError(f"bind_address '{value}': IPv6 bind addresses are not supported")
     if not port.isdigit() or not 1 <= int(port) <= 65535:
         raise ConfigError(f"bind_address '{value}' has invalid port (must be 1-65535)")
     return value

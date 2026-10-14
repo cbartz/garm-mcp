@@ -21,7 +21,7 @@ def _config(prod_exp_delta: int):
     now = int(time.time())
     return Config(
         bind_address="127.0.0.1:8080",
-        endpoint_token="endpoint-secret",
+        endpoint_token="endpoint-secret-0123456789abcdef012345",
         deployments={
             "prod": DeploymentConfig(
                 name="prod",

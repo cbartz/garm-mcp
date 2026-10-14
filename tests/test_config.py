@@ -7,7 +7,7 @@ from conftest import make_jwt
 from garm_mcp.config import load_config, check_token_expiry
 from garm_mcp.errors import ConfigError
 
-VALID = {"bind_address": "127.0.0.1:9000", "endpoint_token": "ep-token",
+VALID = {"bind_address": "127.0.0.1:9000", "endpoint_token": "ep-token-0123456789abcdef0123456789",
          "default_deployment": "prod",
          "deployments": {"prod": {"base_url": "https://p.example.com", "token": "t1", "ca_bundle": None},
                          "staging": {"base_url": "https://s.example.com", "token": "t2", "ca_bundle": None}}}
@@ -15,7 +15,7 @@ VALID = {"bind_address": "127.0.0.1:9000", "endpoint_token": "ep-token",
 def test_load_config_valid(tmp_path):
     p = tmp_path / "config.json"; p.write_text(json.dumps(VALID))
     cfg = load_config(str(p))
-    assert cfg.bind_address == "127.0.0.1:9000" and cfg.endpoint_token == "ep-token"
+    assert cfg.bind_address == "127.0.0.1:9000" and cfg.endpoint_token == "ep-token-0123456789abcdef0123456789"
     assert set(cfg.deployments) == {"prod", "staging"}
     assert cfg.deployments["prod"].base_url == "https://p.example.com"
 
@@ -176,7 +176,7 @@ def test_bind_address_bad_port_raises(tmp_path, value):
 
 def test_bind_address_ipv6_brackets_raises(tmp_path):
     p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(bind_address="[::1]:9000")))
-    with pytest.raises(ConfigError, match="bracketed IPv6 hosts are not supported"):
+    with pytest.raises(ConfigError, match="IPv6 bind addresses are not supported"):
         load_config(str(p))
 
 
@@ -207,3 +207,36 @@ def test_allowed_origins_must_be_list_of_strings(tmp_path):
 def test_exp_non_finite_or_out_of_range_raises(exp):
     with pytest.raises(ConfigError, match="cannot parse GARM token for deployment 'prod'"):
         check_token_expiry("prod", make_jwt({"exp": exp}))
+
+
+def test_short_endpoint_token_raises(tmp_path):
+    p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(endpoint_token="a" * 31)))
+    with pytest.raises(ConfigError, match="strong random value"):
+        load_config(str(p))
+
+
+def test_endpoint_token_minimum_length_ok(tmp_path):
+    p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(endpoint_token="a" * 32)))
+    assert load_config(str(p)).endpoint_token == "a" * 32
+
+
+def test_padded_base_url_raises(tmp_path):
+    cfg = _cfg_with()
+    cfg["deployments"]["prod"]["base_url"] = "https://p.example.com "
+    p = tmp_path / "config.json"; p.write_text(json.dumps(cfg))
+    with pytest.raises(ConfigError, match="deployment 'prod' has invalid 'base_url'"):
+        load_config(str(p))
+
+
+def test_padded_credential_raises(tmp_path):
+    cfg = _cfg_with()
+    cfg["deployments"]["prod"]["username"] = " admin "
+    p = tmp_path / "config.json"; p.write_text(json.dumps(cfg))
+    with pytest.raises(ConfigError, match="deployment 'prod' has invalid 'username'"):
+        load_config(str(p))
+
+
+def test_bind_address_unbracketed_ipv6_raises(tmp_path):
+    p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(bind_address="2001:db8::1:9000")))
+    with pytest.raises(ConfigError, match="IPv6 bind addresses are not supported"):
+        load_config(str(p))
