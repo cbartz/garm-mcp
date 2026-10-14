@@ -105,3 +105,15 @@ def test_flat_error_response_parses():
     with pytest.raises(GarmApiError, match="Bad Request: bad pool") as ei:
         GarmClient(**CLIENT).list_instances()
     assert ei.value.status_code == 400
+
+
+@pytest.mark.parametrize("name", ["", "../credentials", "..", ".", "a/b", "a\\b"])
+def test_get_instance_rejects_unsafe_names(name):
+    with pytest.raises(GarmApiError, match="invalid instance name"):
+        GarmClient(**CLIENT).get_instance(name)
+
+
+@responses.activate
+def test_get_instance_encodes_spaces_and_keeps_single_segment():
+    responses.get(f"{BASE}/api/v1/instances/weird%20name", json={"name": "weird name"})
+    assert GarmClient(**CLIENT).get_instance("weird name")["name"] == "weird name"

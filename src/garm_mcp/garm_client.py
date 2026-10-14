@@ -100,6 +100,13 @@ class GarmClient:
         return self._get("instances")
 
     def get_instance(self, instance_name: str) -> dict:
+        if (
+            not instance_name
+            or "/" in instance_name
+            or "\\" in instance_name
+            or instance_name in (".", "..")
+        ):
+            raise GarmApiError(message="invalid instance name", status_code=None)
         return self._get(f"instances/{quote(instance_name, safe='')}")
 
     def list_scalesets(self) -> list:
