@@ -240,3 +240,17 @@ def test_bind_address_unbracketed_ipv6_raises(tmp_path):
     p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(bind_address="2001:db8::1:9000")))
     with pytest.raises(ConfigError, match="IPv6 bind addresses are not supported"):
         load_config(str(p))
+
+
+@pytest.mark.parametrize("url", ["prod.example.com", "ftp://prod.example.com"])
+def test_base_url_without_http_scheme_raises(tmp_path, url):
+    cfg = _cfg_with()
+    cfg["deployments"]["prod"]["base_url"] = url
+    p = tmp_path / "config.json"; p.write_text(json.dumps(cfg))
+    with pytest.raises(ConfigError, match="deployment 'prod' has invalid 'base_url'"):
+        load_config(str(p))
+
+
+def test_huge_int_exp_raises():
+    with pytest.raises(ConfigError, match="cannot parse GARM token for deployment 'prod'"):
+        check_token_expiry("prod", make_jwt({"exp": 10**400}))

@@ -5,6 +5,7 @@ import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 from garm_mcp.errors import ConfigError
 
@@ -37,6 +38,9 @@ def _parse_deployment(name: str, raw: dict) -> DeploymentConfig:
         raise ConfigError(f"deployment '{name}' missing required key: base_url")
     base_url = raw["base_url"]
     if not isinstance(base_url, str) or not base_url or base_url != base_url.strip():
+        raise ConfigError(f"deployment '{name}' has invalid 'base_url'")
+    split = urlsplit(base_url)
+    if split.scheme not in ("http", "https") or not split.netloc:
         raise ConfigError(f"deployment '{name}' has invalid 'base_url'")
     for key in ("ca_bundle", "token", "username", "password"):
         value = raw.get(key)
