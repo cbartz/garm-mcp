@@ -134,6 +134,8 @@ def _validate_bind_address(value: object) -> str:
     host, _, port = value.rpartition(":")
     if not host:
         raise ConfigError(f"bind_address '{value}' is not 'host:port'")
+    if any(ch.isspace() for ch in host):
+        raise ConfigError(f"bind_address '{value}' has invalid host")
     if ":" in host or host.startswith("["):
         raise ConfigError(f"bind_address '{value}': IPv6 bind addresses are not supported")
     if not port.isdigit() or not 1 <= int(port) <= 65535:

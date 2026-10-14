@@ -276,3 +276,10 @@ def test_base_url_without_hostname_raises(tmp_path, url):
     p = tmp_path / "config.json"; p.write_text(json.dumps(cfg))
     with pytest.raises(ConfigError, match="deployment 'prod' has invalid 'base_url'"):
         load_config(str(p))
+
+
+@pytest.mark.parametrize("value", ["localhost :9000", " 127.0.0.1:9000"])
+def test_bind_address_whitespace_in_host_raises(tmp_path, value):
+    p = tmp_path / "config.json"; p.write_text(json.dumps(_cfg_with(bind_address=value)))
+    with pytest.raises(ConfigError, match="has invalid host"):
+        load_config(str(p))
