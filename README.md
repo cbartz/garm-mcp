@@ -60,7 +60,7 @@ Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/).
    journalctl -u garm-mcp -f
    ```
 
-   `uv run --frozen` syncs `.venv` to `uv.lock` on every start, so an update is `git pull` followed by `sudo systemctl restart garm-mcp`. Whatever is checked out goes live on restart.
+   The unit runs `uv sync --frozen` before every start, so an update is `git pull` followed by `sudo systemctl restart garm-mcp`. Whatever is checked out goes live on restart.
 
 **Allowed Host headers.** The server rejects requests whose `Host` header is not on an allow-list (DNS-rebinding protection; the response is `421 Invalid Host header`). The allow-list is built automatically from `bind_address`: the exact `host:port` you bound, plus its bare host and a bare-host `:*` wildcard, and the same pair for the loopback names (`127.0.0.1`, `localhost`) — so requests with or without an explicit port both match with no extra setup. If the agent reaches the server under a different name or address (a DNS name, a NAT or port-forwarded address, a reverse proxy), list those `Host` values in the optional `allowed_hosts` config key, for example `"allowed_hosts": ["garm-host.lan:9000", "garm-host.lan:*"]` (a trailing `:*` matches any port; each entry's bare host is added automatically). The default is an empty list.
 
